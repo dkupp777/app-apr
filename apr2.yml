@@ -1,0 +1,60 @@
+---
+- hosts: jira
+  remote_user: svc_devops
+  become: yes
+  become_method: sudo
+  vars:
+    aprver: 1.6.3
+    aprutilver: 1.6.1
+    tomcatnativever: 1.2.16
+  tasks:
+  - name: Extract APR
+    unarchive:
+      src: /media/packages/apr/apr-{{ aprver }}.tar.gz
+      dest: /tmp
+  - name: Extract APR Utils
+    unarchive:
+      src: /media/packages/apr/apr-util-{{ aprutilver }}.tar.gz
+      dest: /tmp
+  - name: Extract Tomcat Native
+    unarchive:
+      src: /media/packages/apr/tomcat-native-{{ tomcatnativever }}-src.tar.gz
+      dest: /tmp
+  - name: Install prerequisite packages
+    yum: name={{ item }} state=present disable_gpg_check=yes
+    with_items: 
+    - openssl-devel
+    - apr-devel
+    - gcc
+    - expat-devel
+    - java-1.8.0-openjdk-devel*
+    - "@Development Tools"
+  - name: Replace APR config file parm
+    replace:
+      path: /tmp/apr-{{ aprver }}/configure
+      regexp: '$RM "$cfgfile"'
+      replace: '$RM -f "$cfgfile"'
+  - name: Install APR - configure
+    command: '"{{ item }}" chdir=/tmp/apr-{{ aprver }}'
+    with_items:
+      - ./configure
+  - name: Install APR - "make"
+    make:
+      chdir: /tmp/apr-{{ aprver }}/
+      target: install
+  - name: Install APR Utils - configure
+    shell: './configure --with-apr=/usr/local/apr'
+    args:
+      chdir: /tmp/apr-util-{{ aprutilver }}
+  - name: Install APR Util - "make"
+    make:
+      chdir: /tmp/apr-util-{{ aprutilver }}/
+      target: install
+  - name: Install Tomcat Native - configure
+    shell: './configure --with-java-home=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.171-8.b10.el7_5.x86_64'
+    args:
+      chdir: /tmp/tomcat-native-{{ tomcatnativever }}-src/native/
+  - name: Install Tomcat Native - "make"
+    make: 
+      chdir: /tmp/tomcat-native-{{ tomcatnativever }}-src/native/
+      target: install
